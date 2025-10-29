@@ -68,7 +68,7 @@ load_dotenv()
 mcp = FastMCP("kayako_mcp")
 
 # Constants
-API_BASE_URL = os.getenv("KAYAKO_API_URL", "")
+API_BASE_URL = os.getenv("KAYAKO_API_URL", "").rstrip("/?")  # Remove trailing / or ?
 API_KEY = os.getenv("KAYAKO_API_KEY", "")
 SECRET_KEY = os.getenv("KAYAKO_SECRET_KEY", "")
 CHARACTER_LIMIT = 25000
