@@ -104,12 +104,9 @@ The `--test-credentials` flag verifies your API connection:
 
 ### Add to Claude Code
 
-```bash
-claude mcp add --transport stdio kayako \
-  -- uv run /Users/moroz/Projects/test-skills/kayako-mcp/kayako_mcp.py
-```
+**Important:** You must specify the working directory (`cwd`) so `uv run` can find `pyproject.toml` and create the virtual environment.
 
-Or add manually to `~/.claude.json`:
+Add manually to `~/.claude.json`:
 
 ```json
 {
@@ -117,10 +114,8 @@ Or add manually to `~/.claude.json`:
     "kayako": {
       "type": "stdio",
       "command": "uv",
-      "args": [
-        "run",
-        "/Users/moroz/Projects/test-skills/kayako-mcp/kayako_mcp.py"
-      ],
+      "args": ["run", "kayako_mcp.py"],
+      "cwd": "/absolute/path/to/kayako-mcp-server",
       "env": {
         "KAYAKO_API_URL": "https://yourcompany.kayako.com/api/index.php",
         "KAYAKO_API_KEY": "your-api-key",
@@ -130,6 +125,75 @@ Or add manually to `~/.claude.json`:
   }
 }
 ```
+
+**⚠️ Important configuration notes:**
+
+1. **Replace `/absolute/path/to/kayako-mcp-server`** with the actual path where you cloned this repository
+   - Find your path: `cd kayako-mcp-server && pwd`
+   - Example: `/Users/yourname/Projects/kayako-mcp-server` (macOS/Linux)
+   - Example: `C:\Users\yourname\kayako-mcp-server` (Windows - use forward slashes)
+
+2. **The `cwd` field is required** for `uv run` to work correctly
+   - Without it, `uv` won't find `pyproject.toml` and dependencies won't install
+   - This causes "ModuleNotFoundError: No module named 'httpx'" errors
+
+3. **Remove trailing `?` or `/` from `KAYAKO_API_URL`**
+   - ✅ Correct: `https://yourcompany.kayako.com/api/index.php`
+   - ❌ Wrong: `https://yourcompany.kayako.com/api/index.php?`
+
+4. **Use your actual Kayako credentials**
+   - Get them from Kayako Admin CP → REST API section
+   - Test them first: `uv run kayako_mcp.py --test-credentials`
+
+**Complete example configuration:**
+
+```json
+{
+  "mcpServers": {
+    "kayako": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "kayako_mcp.py"],
+      "cwd": "/Users/john/Projects/kayako-mcp-server",
+      "env": {
+        "KAYAKO_API_URL": "https://support.example.com/api/index.php",
+        "KAYAKO_API_KEY": "abc12345-6789-0def-ghij-klmnopqrstuv",
+        "KAYAKO_SECRET_KEY": "xyz98765-4321-0abc-defg-hijklmnopqrst"
+      }
+    }
+  }
+}
+```
+
+**Alternative: Using `.env` file instead of inline environment variables**
+
+If you prefer to keep credentials in a `.env` file (more secure for git repositories):
+
+1. Create `.env` in your kayako-mcp-server directory:
+   ```bash
+   cd /your/path/to/kayako-mcp-server
+   cp .env.example .env
+   # Edit .env with your credentials
+   ```
+
+2. Simplified `~/.claude.json` configuration:
+   ```json
+   {
+     "mcpServers": {
+       "kayako": {
+         "type": "stdio",
+         "command": "uv",
+         "args": ["run", "kayako_mcp.py"],
+         "cwd": "/absolute/path/to/kayako-mcp-server"
+       }
+     }
+   }
+   ```
+
+**Troubleshooting:** If you see "ModuleNotFoundError: No module named 'httpx'", verify that:
+- The `cwd` path exists and points to the kayako-mcp-server directory
+- You can see `pyproject.toml` in that directory
+- Try running `cd /your/path && uv sync` to manually create the virtual environment
 
 ### Example Queries
 
