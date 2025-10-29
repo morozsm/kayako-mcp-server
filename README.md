@@ -73,14 +73,30 @@ KAYAKO_SECRET_KEY=your-secret-key-here
 ### Step 3: Test the server
 
 ```bash
-# Using uv
+# Show help information
 uv run kayako_mcp.py --help
-
-# Using python directly
 python kayako_mcp.py --help
+
+# Test API credentials (recommended)
+uv run kayako_mcp.py --test-credentials
+python kayako_mcp.py -t
 ```
 
-If configured correctly, you should see MCP server help information without errors.
+The `--test-credentials` flag verifies your API connection:
+- ✅ **Success**: Shows connection details and number of departments found
+- ❌ **Failure**: Displays specific error (401, 403, 404, timeout) with diagnostic info
+
+**Example successful test:**
+```
+🔍 Testing Kayako API credentials...
+
+✅ SUCCESS: API credentials are valid and working
+
+📊 Connection Details:
+  • Api Url: https://yourcompany.kayako.com/api/index.php
+  • Api Key: abc1234567...
+  • Departments Found: 5
+```
 
 ---
 
@@ -238,10 +254,12 @@ Get ticket statuses in JSON format
 ## Architecture
 
 ### Authentication
-Uses Kayako's signature-based authentication:
-1. Generate random salt for each request
-2. Create signature: `Base64(SHA256(salt + secret_key))`
+Uses Kayako Classic's HMAC-based signature authentication:
+1. Generate random salt for each request (32 hex characters)
+2. Create signature: `Base64(HMAC-SHA256(key=secret_key, message=salt))`
 3. Send `apikey`, `salt`, and `signature` with each request
+
+**Note:** Kayako Classic requires HMAC-SHA256, not plain SHA256. HMAC (Hash-based Message Authentication Code) is a cryptographic algorithm that combines a secret key with the message using a hash function.
 
 ### XML Parsing
 - Kayako Classic uses XML for all responses
@@ -303,9 +321,12 @@ uv run kayako_mcp.py --help
 ## Troubleshooting
 
 ### "Authentication failed" error
+- **First step:** Run `uv run kayako_mcp.py --test-credentials` to diagnose the issue
 - Verify `KAYAKO_API_KEY` and `KAYAKO_SECRET_KEY` are correct
 - Check that API access is enabled in Kayako Admin CP
 - Ensure your API key has necessary permissions
+- **Important:** Remove trailing `?` or `/` from `KAYAKO_API_URL` (e.g., use `https://company.kayako.com/api/index.php` not `https://company.kayako.com/api/index.php?`)
+- **Note:** This server only works with Kayako Classic (v3/v4), not Kayako v5+ which uses OAuth tokens
 
 ### "Request timed out" error
 - Kayako server may be slow or experiencing issues
