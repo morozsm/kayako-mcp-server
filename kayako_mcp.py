@@ -14,6 +14,7 @@ Environment Variables:
 import os
 import sys
 import hashlib
+import hmac
 import base64
 import secrets
 import json
@@ -97,6 +98,9 @@ class ResponseFormat(str, Enum):
 def _generate_signature(api_key: str, secret_key: str) -> tuple[str, str, str]:
     """Generate Kayako API authentication signature.
 
+    Kayako Classic uses HMAC-SHA256 for authentication:
+    signature = Base64(HMAC-SHA256(salt, secret_key))
+
     Args:
         api_key: Kayako API key
         secret_key: Kayako secret key
@@ -107,8 +111,13 @@ def _generate_signature(api_key: str, secret_key: str) -> tuple[str, str, str]:
     # Generate random salt
     salt = secrets.token_hex(16)
 
-    # Create signature: HMAC-SHA256(salt, secret_key)
-    signature_bytes = hashlib.sha256(f"{salt}{secret_key}".encode()).digest()
+    # Create signature using HMAC-SHA256
+    # HMAC(key=secret_key, message=salt, digest=SHA256)
+    signature_bytes = hmac.new(
+        secret_key.encode(),
+        salt.encode(),
+        hashlib.sha256
+    ).digest()
     signature = base64.b64encode(signature_bytes).decode()
 
     return api_key, salt, signature
@@ -685,14 +694,20 @@ async def test_api_credentials() -> dict[str, Any]:
 
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
+        response_text = e.response.text[:500] if e.response.text else "No response body"
+
         result["message"] = f"HTTP {status} error"
         result["details"] = {
             "api_url": API_BASE_URL,
             "status_code": status,
-            "error": str(e)
+            "error": str(e),
+            "response_body": response_text
         }
         if status == 401:
             result["message"] = "Authentication failed - check your API key and secret key"
+            # Check if this might be Kayako v5+ which uses different auth
+            if "oauth" in response_text.lower() or "bearer" in response_text.lower():
+                result["message"] += " (Note: This might be Kayako v5+ which requires OAuth/Bearer token auth instead of signature auth)"
         elif status == 404:
             result["message"] = "API endpoint not found - check your API URL"
         elif status == 403:
