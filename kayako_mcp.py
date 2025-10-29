@@ -12,6 +12,7 @@ Environment Variables:
 """
 
 import os
+import sys
 import hashlib
 import base64
 import secrets
@@ -19,6 +20,38 @@ import json
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from datetime import datetime
+
+# Handle --help before importing heavy dependencies
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help', 'help']:
+    print("""
+Kayako MCP Server - Model Context Protocol server for Kayako Classic API
+
+Usage:
+    python kayako_mcp.py          # Start MCP server
+    python kayako_mcp.py --help   # Show this help
+
+Environment Variables (required):
+    KAYAKO_API_URL     - Your Kayako API endpoint
+    KAYAKO_API_KEY     - Your Kayako API key
+    KAYAKO_SECRET_KEY  - Your Kayako secret key
+
+Example .env file:
+    KAYAKO_API_URL=https://company.kayako.com/api/index.php
+    KAYAKO_API_KEY=your-api-key
+    KAYAKO_SECRET_KEY=your-secret-key
+
+Tools provided:
+    kayako_search_tickets      - Search tickets by content/subject/user
+    kayako_get_ticket          - Get complete ticket details
+    kayako_list_tickets        - List tickets with filtering
+    kayako_get_ticket_posts    - Get conversation history
+    kayako_get_departments     - List all departments (for filtering)
+    kayako_get_ticket_statuses - List all statuses (for filtering)
+
+For integration with Claude Code:
+    claude mcp add --transport stdio kayako -- uv run kayako_mcp.py
+""")
+    sys.exit(0)
 
 import httpx
 from lxml import etree
@@ -1181,7 +1214,7 @@ if __name__ == "__main__":
         print("  1. Copy .env.example to .env and fill in your credentials")
         print("  2. Set environment variables directly")
         print("\nExiting...")
-        exit(1)
+        sys.exit(1)
 
     # Run the MCP server
     mcp.run()
