@@ -27,8 +27,10 @@ if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] in ['-h', '--hel
 Kayako MCP Server - Model Context Protocol server for Kayako Classic API
 
 Usage:
-    python kayako_mcp.py          # Start MCP server
-    python kayako_mcp.py --help   # Show this help
+    python kayako_mcp.py                       # Start MCP server
+    python kayako_mcp.py --help                # Show this help
+    python kayako_mcp.py --test-credentials    # Test API connection
+    python kayako_mcp.py -t                    # Test API connection (short)
 
 Environment Variables (required):
     KAYAKO_API_URL     - Your Kayako API endpoint
@@ -627,6 +629,93 @@ class GetTicketStatusesInput(BaseModel):
 
 
 # ============================================================================
+# Credentials Testing
+# ============================================================================
+
+async def test_api_credentials() -> dict[str, Any]:
+    """Test Kayako API credentials and connection.
+
+    Makes a simple API request to verify:
+    - API credentials are valid
+    - API endpoint is reachable
+    - Authentication signature works correctly
+
+    Returns:
+        dict: Test results with status, message, and details
+    """
+    result = {
+        "success": False,
+        "message": "",
+        "details": {}
+    }
+
+    # Check if credentials are configured
+    if not API_BASE_URL or not API_KEY or not SECRET_KEY:
+        result["message"] = "API credentials not configured"
+        result["details"] = {
+            "api_url_set": bool(API_BASE_URL),
+            "api_key_set": bool(API_KEY),
+            "secret_key_set": bool(SECRET_KEY)
+        }
+        return result
+
+    # Test connection with a simple request (get departments)
+    try:
+        response = await _make_kayako_request(
+            endpoint="/Base/Department",
+            method="GET"
+        )
+
+        # Check if response has expected structure
+        if "department" in response or "departments" in response:
+            result["success"] = True
+            result["message"] = "API credentials are valid and working"
+            result["details"] = {
+                "api_url": API_BASE_URL,
+                "api_key": API_KEY[:10] + "..." if len(API_KEY) > 10 else API_KEY,
+                "response_keys": list(response.keys()),
+                "departments_found": len(response.get("department", [])) if isinstance(response.get("department"), list) else (1 if response.get("department") else 0)
+            }
+        else:
+            result["message"] = "Unexpected API response structure"
+            result["details"] = {
+                "api_url": API_BASE_URL,
+                "response_keys": list(response.keys())
+            }
+
+    except httpx.HTTPStatusError as e:
+        status = e.response.status_code
+        result["message"] = f"HTTP {status} error"
+        result["details"] = {
+            "api_url": API_BASE_URL,
+            "status_code": status,
+            "error": str(e)
+        }
+        if status == 401:
+            result["message"] = "Authentication failed - check your API key and secret key"
+        elif status == 404:
+            result["message"] = "API endpoint not found - check your API URL"
+        elif status == 403:
+            result["message"] = "Access forbidden - check API permissions"
+
+    except httpx.TimeoutException:
+        result["message"] = f"Connection timed out after {DEFAULT_TIMEOUT}s"
+        result["details"] = {
+            "api_url": API_BASE_URL,
+            "timeout": DEFAULT_TIMEOUT
+        }
+
+    except Exception as e:
+        result["message"] = f"Unexpected error: {type(e).__name__}"
+        result["details"] = {
+            "api_url": API_BASE_URL,
+            "error": str(e)
+        }
+
+    return result
+
+
+# ============================================================================
 # MCP Tools
 # ============================================================================
 
@@ -1203,6 +1292,39 @@ async def kayako_get_ticket_statuses(params: GetTicketStatusesInput) -> str:
 # ============================================================================
 
 if __name__ == "__main__":
+    import asyncio
+
+    # Handle --test-credentials flag
+    if len(sys.argv) > 1 and sys.argv[1] in ['--test-credentials', '--test', '-t']:
+        print("\n🔍 Testing Kayako API credentials...\n")
+
+        # Run async test
+        result = asyncio.run(test_api_credentials())
+
+        # Display results
+        if result["success"]:
+            print("✅ SUCCESS: " + result["message"])
+            print("\n📊 Connection Details:")
+            for key, value in result["details"].items():
+                print(f"  • {key.replace('_', ' ').title()}: {value}")
+        else:
+            print("❌ FAILED: " + result["message"])
+            print("\n📊 Details:")
+            for key, value in result["details"].items():
+                print(f"  • {key.replace('_', ' ').title()}: {value}")
+
+            # Show tips only if credentials are not configured
+            if "api_url_set" in result["details"]:
+                if not result["details"].get("api_url_set"):
+                    print("\n💡 Tip: Set KAYAKO_API_URL environment variable")
+                if not result["details"].get("api_key_set"):
+                    print("💡 Tip: Set KAYAKO_API_KEY environment variable")
+                if not result["details"].get("secret_key_set"):
+                    print("💡 Tip: Set KAYAKO_SECRET_KEY environment variable")
+
+        print()
+        sys.exit(0 if result["success"] else 1)
+
     # Validate configuration before starting
     if not API_BASE_URL or not API_KEY or not SECRET_KEY:
         print("\n❌ ERROR: Kayako API credentials not configured!")
